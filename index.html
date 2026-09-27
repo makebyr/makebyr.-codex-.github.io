@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Makebyr - Codex Vault</title>
+  <link rel="icon" type="image/jpeg" href="favicon.jpg">
+  
+  <style>
+    :root {
+      --primary: #0078d4;
+      --primary-hover: #106ebe;
+      --bg-color: #f3f2f1;
+      --card-bg: #ffffff;
+      --text-color: #201f1e;
+      --border-color: #e1dfdd;
+      --danger: #d13438;
+      --success: #107c10;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-color); min-height: 100vh; display: flex; flex-direction: column; }
+
+    header { background-color: #ffffff; border-bottom: 1px solid var(--border-color); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .brand { font-size: 1.4rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+    
+    .actions-bar { display: flex; gap: 10px; align-items: center; }
+    .search-box { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; width: 250px; outline: none; }
+    .search-box:focus { border-color: var(--primary); }
+
+    .btn { padding: 8px 16px; border-radius: 4px; border: none; font-weight: 600; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+    .btn-success { background-color: var(--success); color: white; }
+    .btn-danger { background-color: var(--danger); color: white; }
+
+    main { max-width: 1400px; width: 100%; margin: 20px auto; padding: 0 20px; flex: 1; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .card h3 { margin-bottom: 5px; font-size: 1.1rem; }
+    .card-author { font-size: 0.8rem; color: #605e5c; margin-bottom: 10px; font-style: italic; }
+
+    pre { background: #1e1e1e; color: #dcdcdc; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; max-height: 150px; overflow-y: auto; margin-bottom: 12px; white-space: pre-wrap; word-break: break-all; }
+
+    /* Modales */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
+    .modal-content { background: white; padding: 30px; border-radius: 8px; width: 100%; max-width: 450px; position: relative; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; }
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; outline: none; }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); }
+    .close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+
+    footer { text-align: center; padding: 20px; font-size: 0.85rem; color: #605e5c; border-top: 1px solid var(--border-color); background: #faf9f8; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="brand">📁 Makebyr Codex Vault</div>
+    <div class="actions-bar">
+      <input type="text" id="search-input" class="search-box" placeholder="Buscar codex..." onkeyup="filterCodex()">
+      <button class="btn btn-primary" onclick="openModal()">+ Crear Codex</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="codex-grid" class="grid"></div>
+  </main>
+
+  <footer>Makebyr Digital Brand © 2026</footer>
+
+  <!-- Modal Crear Codex -->
+  <div id="modal-codex" class="modal">
+    <div class="modal-content">
+      <button class="close-modal" onclick="closeModal()">✕</button>
+      <h2>Crear Nuevo Codex</h2>
+      <div class="form-group" style="margin-top: 15px;">
+        <label>Creado por (Tu Nombre)</label>
+        <input type="text" id="codex-author" placeholder="Ej: Tu Nombre">
+      </div>
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="codex-title" placeholder="Título del código">
+      </div>
+      <div class="form-group">
+        <label>Código</label>
+        <textarea id="codex-content" rows="6" placeholder="Pega tu código aquí..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Visibilidad</label>
+        <select id="codex-visibility">
+          <option value="publico">Público</option>
+          <option value="privado">Privado</option>
+        </select>
+      </div>
+      <button class="btn btn-success" style="width: 100%;" onclick="saveCodex()">Publicar Codex</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. Verificación de contraseña al entrar a la página
+    const ADMIN_PASSWORD = "makebyr567";
+    (function verifyAdmin() {
+      const pass = prompt("Acceso restringido. Ingresa la contraseña de admin (makeby):");
+      if (pass !== ADMIN_PASSWORD) {
+        alert("Contraseña incorrecta.");
+        document.body.innerHTML = "<div style='display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column;'><h2 style='color:#d13438;'>Acceso Denegado</h2><p>Recarga la página e intenta de nuevo con la contraseña correcta.</p></div>";
+        throw new Error("No autorizado");
+      }
+    })();
+
+    // 2. Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCKvNViTMiARSW5sa5BoIZmF9cm7XL9bQY",
+      authDomain: "raty-studios-servers.firebaseapp.com",
+      databaseURL: "https://raty-studios-servers-default-rtdb.firebaseio.com",
+      projectId: "raty-studios-servers",
+      storageBucket: "raty-studios-servers.firebasestorage.app",
+      messagingSenderId: "1033991074708",
+      appId: "1:1033991074708:web:b39be9e157b357cd94d581"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let allCodexList = [];
+
+    function openModal() {
+      document.getElementById('modal-codex').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modal-codex').style.display = 'none';
+    }
+
+    // Guardar Codex en Firebase
+    function saveCodex() {
+      const author = document.getElementById('codex-author').value.trim();
+      const title = document.getElementById('codex-title').value.trim();
+      const code = document.getElementById('codex-content').value;
+      const visibility = document.getElementById('codex-visibility').value;
+
+      if (!author || !title || !code) {
+        return alert('Por favor llena todos los campos.');
+      }
+
+      db.ref('makebyr_codex').push({
+        author: author,
+        title: title,
+        code: code,
+        visibility: visibility,
+        time: firebase.database.ServerValue.TIMESTAMP
+      }).then(() => {
+        document.getElementById('codex-author').value = '';
+        document.getElementById('codex-title').value = '';
+        document.getElementById('codex-content').value = '';
+        closeModal();
+        alert('¡Codex creado con éxito!');
+      }).catch(err => {
+        alert('Error al guardar en la base de datos.');
+      });
+    }
+
+    // Cargar Codex desde Firebase
+    function loadCodex() {
+      db.ref('makebyr_codex').on('value', snap => {
+        allCodexList = [];
+        const data = snap.val();
+        if (data) {
+          Object.keys(data).forEach(k => {
+            allCodexList.push({ id: k, ...data[k] });
+          });
+        }
+        renderCodex(allCodexList);
+      });
+    }
+
+    // Renderizar tarjetas en pantalla
+    function renderCodex(list) {
+      const grid = document.getElementById('codex-grid');
+      grid.innerHTML = '';
+
+      if (list.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #605e5c; padding: 40px;">No hay codex guardados.</div>`;
+        return;
+      }
+
+      list.reverse().forEach(item => {
+        const safeCode = item.code.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+        const visibilityBadge = item.visibility === 'privado' ? '🔒 Privado' : '🌐 Público';
+
+        grid.innerHTML += `
+          <div class="card">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h3>${escapeHtml(item.title)}</h3>
+                <span style="font-size: 0.75rem; background: #e1dfdd; padding: 2px 6px; border-radius: 4px;">${visibilityBadge}</span>
+              </div>
+              <div class="card-author">Creado por: ${escapeHtml(item.author)}</div>
+              <pre><code>${escapeHtml(item.code)}</code></pre>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+              <button class="btn btn-primary" style="flex: 1;" onclick="copyCodeText(this, \`${safeCode}\`)">Copiar Código</button>
+              <button class="btn btn-danger" onclick="deleteCodex('${item.id}')">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // Buscador en tiempo real (sin dar enter)
+    function filterCodex() {
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const filtered = allCodexList.filter(item => 
+        item.title.toLowerCase().includes(query) || 
+        item.author.toLowerCase().includes(query) ||
+        item.code.toLowerCase().includes(query)
+      );
+      renderCodex(filtered);
+    }
+
+    function deleteCodex(id) {
+      if (confirm("¿Estás seguro de eliminar este Codex?")) {
+        db.ref('makebyr_codex/' + id).remove();
+      }
+    }
+
+    function copyCodeText(buttonEl, text) {
+      const cleanText = text.replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+      navigator.clipboard.writeText(cleanText).then(() => {
+        const originalText = buttonEl.innerText;
+        buttonEl.innerText = '¡Copiado!';
+        buttonEl.style.backgroundColor = 'var(--success)';
+        setTimeout(() => {
+          buttonEl.innerText = originalText;
+          buttonEl.style.backgroundColor = '';
+        }, 2000);
+      }).catch(err => {
+        alert('Error al copiar el código.');
+      });
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    window.onload = () => {
+      loadCodex();
+    };
+  </script>
+</body>
+</html>
